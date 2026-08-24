@@ -1,0 +1,26 @@
+# Never upload source cutsheets or compiled packages: copyrighted manufacturer
+# documents, filenames identify clients and projects, and they're large.
+Cutsheets/
+**/Cutsheets/
+*.pdf
+
+# Registry backups may contain client and project names.
+Mazzetti_Luminaire_Registry_*.json
+Mazzetti_Issuance_Log_*.csv
+
+# Python port and its assets are not part of the web deploy.
+compile_package.py
+mz_design.py
+ArchivoBlack.ttf
+__pycache__/
+
+# Superseded builds.
+Archive/
+
+# The drag-and-drop archive is a copy of this site; never publish it.
+*.zip
+
+# Local noise
+.DS_Store
+Thumbs.db
+node_modules/

@@ -1,0 +1,22 @@
+# Never publish source cutsheets: they're copyrighted manufacturer documents,
+# the filenames identify clients and projects, and they're large binaries.
+Cutsheets/
+**/Cutsheets/
+
+# Compiled packages land next to the cutsheets, not in the repo.
+*.pdf
+# ...but the wordmark is a build asset mz_design.py needs. Keep it.
+!mz_wordmark.pdf
+
+# Registry backups may contain client and project names.
+Mazzetti_Luminaire_Registry_*.json
+Mazzetti_Issuance_Log_*.csv
+
+# Local noise
+__pycache__/
+node_modules/
+.DS_Store
+Thumbs.db
+
+# Deploy archive (a copy of the site, rebuilt on demand).
+*.zip
