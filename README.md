@@ -90,5 +90,5 @@ is for one-offs and for someone else's project.
 
 ## Note
 
-`helvetica_kerning.json` is no longer used and can be deleted — the current
-build doesn't measure Helvetica for any stamped text.
+`helvetica_kerning.json` was no longer used and has been removed, along with
+the rest of the legacy `Archive/` folder.
