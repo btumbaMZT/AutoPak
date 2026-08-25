@@ -2,7 +2,6 @@
   "name": "autopak",
   "private": true,
   "dependencies": {
-    "@neondatabase/serverless": "^0.10.0",
-    "resend": "^4.0.0"
+    "@neondatabase/serverless": "^0.10.0"
   }
 }
