@@ -34,11 +34,14 @@ neither of which needs to sit on a public host.
 | **B — Git** | Git account | **Yes** | Auto-deploy on every push |
 | **C — Drop** | Nothing | **No — new URL each time** | A 2-minute look, once |
 
-**Route A is the one to use.** The reason is specific to AutoPak: the registry
-lives in `localStorage`, which browsers scope **per origin**. Every project gets
-its own URL, so a changing URL means a vanishing registry. Route C creates a
-brand-new project on every upload, which means a new URL, which means everyone's
-project records disappear. Fine to look at, wrong to live on.
+**Route B (Git) is what's actually deployed.** The registry now lives in
+Postgres, behind `/api/registry`, shared by everyone who hits the domain — it's
+no longer the origin-scoped `localStorage` that made Route A's "same URL every
+time" so important. Route A/CLI still works for a one-off deploy if you ever
+need it. **Route C (Vercel Drop) will not work for this project anymore** —
+Drop only uploads the four static files listed there, with no way to include
+the `api/` folder or `package.json` the backend needs, so a Drop deployment
+would load with a permanently empty, unsaveable registry.
 
 ---
 
@@ -98,8 +101,10 @@ You want to see `x-robots-tag: noindex, nofollow, ...`. If it's missing,
 `vercel.json` didn't get uploaded — confirm it's in the folder and redeploy.
 
 **Step 6 — open it and confirm.** Load the URL, add a project, reload, and check
-it is still there — that is the registry writing to `localStorage`. Visit
-`/compiler` for the standalone tool. Compile a small package to be sure.
+it is still there — that's the round trip through `/api/registry` to Postgres,
+not a local browser cache, so it should show up for anyone else who opens the
+same URL too. Visit `/compiler` for the standalone tool. Compile a small
+package to be sure.
 
 For a package with no project record, either use `/compiler` or, in the
 dashboard, **+ Package → Standalone** — that mode reads and writes nothing in
@@ -177,24 +182,29 @@ project records.
 
 ## Three things to know before you send the link round
 
-**1. The registry is per-person.**
-On Vercel, records go to the browser's `localStorage`, scoped to the origin
-serving the files. Each person's dashboard is their own. The hand-off is
-`↓ .json` / `↑ import` on the **Projects** toolbar; `↓ .csv` on the **Issuance
-log** gives a flat log for spreadsheets.
+**1. The registry is shared office-wide.**
+On Vercel, the dashboard talks to `/api/registry`, backed by one Postgres row —
+everyone hitting the same domain reads and writes the same projects/issuances.
+This is a change from the old per-browser `localStorage` model: opening the
+dashboard from a fresh browser no longer starts you with an empty registry.
+There's no login — anyone with the link can view and edit, same as before.
+A one-time "what's your name?" prompt (skippable, no password) just stamps
+`createdBy`/`updatedBy`/`loggedBy` on records so the team can see who touched
+what. `↓ .json` / `↑ import` on the **Projects** toolbar and `↓ .csv` on the
+**Issuance log** still work exactly as before, for backups/spreadsheets.
 
-Note the dashboard no longer says so on screen — the storage banner was removed
-to clean up the header. The **Synced** pill in the toolbar means "the last write
-succeeded", not "shared with the team". Worth saying out loud when you hand the
-link over.
+The **Synced** pill in the toolbar means "the last write succeeded". If two
+people save the same record at once, the second save is rejected with a
+"someone else just saved changes — reload" prompt rather than silently
+clobbering the first — reload and redo the edit against the latest data.
 
-- **Preview URLs are different origins from production.** A record added on
-  `autopak-vercel-git-abc123.vercel.app` is invisible on
-  `autopak-vercel.vercel.app`.
-- **Clearing site data wipes the registry.** Export before browser cleanup.
-
-If shared records become the point, that's a real backend — Vercel Postgres or
-Blob behind an API route, plus auth. A follow-up, not a config change.
+- **Preview URLs may share or diverge from the production database**,
+  depending on how the Postgres/Neon integration's environment variables are
+  configured for Preview vs. Production — worth confirming so a stray preview
+  deploy can't edit real studio data.
+- **Opening `index.html` straight from disk (`file://`)** still falls back to
+  the old private per-machine `localStorage` behavior — no network calls, no
+  name prompt. Only the Vercel-hosted URL is the shared, office-wide copy.
 
 **2. Folder linking gets better, not worse.**
 "Link folder…" uses the File System Access API, which needs a secure context.

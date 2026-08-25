@@ -399,14 +399,21 @@ details.more .grid{margin-top:14px}
 <script>
 (function(){
 /* ═══════════ Storage ═══════════ */
-const KEY='mazzetti:luminaire-registry:v1', SHARED=true;
-const hasCloud=!!(window.storage&&typeof window.storage.get==='function');
-// Fallback for when this file is opened straight from disk (file://), where
-// window.storage doesn't exist. Records then persist per-machine in
+const KEY='mazzetti:luminaire-registry:v1';
+const NAME_KEY='mazzetti:display-name:v1';
+// Server mode (http/https) shares one registry via /api/registry for everyone
+// on the deployed site. Local mode is the fallback for when this file is
+// opened straight from disk (file://), where records persist per-machine in
 // localStorage instead of evaporating with the tab.
+const hasServer=location.protocol==='http:'||location.protocol==='https:';
 const hasLocal=(function(){try{localStorage.setItem(KEY+':probe','1');localStorage.removeItem(KEY+':probe');return true;}catch(e){return false;}})();
-const STORE=hasCloud?'cloud':hasLocal?'local':'none';
+const STORE=hasServer?'server':hasLocal?'local':'none';
 let reg={version:1,projects:[],issuances:[]}, storeOk=STORE!=='none';
+let lastLoadedRevision=null;
+let loadFailed=false;
+function getName(){try{return localStorage.getItem(NAME_KEY)||'';}catch(e){return '';}}
+function setName(n){try{localStorage.setItem(NAME_KEY,n);}catch(e){}}
+let displayName=getName();
 
 const $=id=>document.getElementById(id);
 const uid=p=>p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -418,22 +425,52 @@ function fmtShort(iso){if(!iso)return '—';const d=new Date(String(iso).length<
 
 function adopt(raw){ if(!raw)return; try{const p=JSON.parse(raw); if(p&&Array.isArray(p.projects))reg=p;}catch(e){} }
 async function load(){
-  if(STORE==='cloud'){
-    try{const r=await window.storage.get(KEY,SHARED); if(r&&r.value)adopt(r.value); return;}catch(e){}
+  if(STORE==='server'){
+    try{
+      const res=await fetch('/api/registry');
+      if(res.ok){ const d=await res.json(); if(d&&Array.isArray(d.projects))reg=d; lastLoadedRevision=(d&&d.revision)||null; storeOk=true; loadFailed=false; }
+      else { storeOk=false; loadFailed=true; }
+    }catch(e){ storeOk=false; loadFailed=true; }
+    return;
   }
   if(STORE==='local'){ try{adopt(localStorage.getItem(KEY));}catch(e){} return; }
   storeOk=false;
 }
-async function save(){ reg.updatedAt=new Date().toISOString();
-  if(STORE==='cloud'){
-    try{await window.storage.set(KEY,JSON.stringify(reg),SHARED);storeOk=true;return true;}
-    catch(e){storeOk=false;toast('Save failed — export a backup before closing');renderRail();return false;}
+async function save(opts){ opts=opts||{}; reg.updatedAt=new Date().toISOString();
+  if(STORE==='server'){
+    try{
+      const res=await fetch('/api/registry',{method:'PUT',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({doc:{version:reg.version,projects:reg.projects,issuances:reg.issuances},expectedRevision:lastLoadedRevision,updatedBy:displayName})});
+      if(res.status===409){ storeOk=false; renderRail(); if(!opts.silent)showConflict(); return false; }
+      if(!res.ok){ storeOk=false; if(!opts.silent)toast('Save failed — export a backup before closing'); renderRail(); return false; }
+      const body=await res.json(); reg.updatedAt=body.updatedAt; lastLoadedRevision=body.revision;
+      storeOk=true; return true;
+    }catch(e){ storeOk=false; if(!opts.silent)toast('Save failed — export a backup before closing'); renderRail(); return false; }
   }
   if(STORE==='local'){
     try{localStorage.setItem(KEY,JSON.stringify(reg));storeOk=true;return true;}
-    catch(e){storeOk=false;toast('Save failed (storage full?) — export a backup now');renderRail();return false;}
+    catch(e){storeOk=false;if(!opts.silent)toast('Save failed (storage full?) — export a backup now');renderRail();return false;}
   }
   storeOk=false;renderRail();return false;
+}
+function showConflict(){
+  modal('Someone else just saved changes','Reload to see the latest, then redo your edit',
+    '<p class="det-v">Another save landed on the shared registry before yours did, so your change was not applied. Reload to pick up the latest version, then make your edit again.</p>',
+    '<button class="btn btn-dark" id="go">Reload latest</button>');
+  $('modalRoot').querySelector('#go').onclick=async()=>{ close(); await load(); render(true); };
+}
+function maybeAskName(){
+  if(displayName||STORE!=='server')return;
+  modal('What’s your name?','Shown on records you add or edit — you can skip this',
+    '<div class="f full"><label for="f_name_prompt">Your name</label><input id="f_name_prompt" type="text" placeholder="e.g. Jane Smith"></div>',
+    '<button class="btn" id="skip">Skip</button><button class="btn btn-dark" id="go">Save</button>');
+  const r=$('modalRoot');
+  r.querySelector('#skip').onclick=close;
+  r.querySelector('#go').onclick=()=>{
+    const v=r.querySelector('#f_name_prompt').value.trim();
+    if(v){displayName=v;setName(v);}
+    close();
+  };
 }
 
 /* ═══════════ Model ═══════════ */
@@ -651,7 +688,7 @@ function addProject(then){
   wireColors(r); wireFolder(r,null);
   r.querySelector('#go').onclick=async()=>{
     const d=readProject(r); if(!d.name){r.querySelector('#f_name').focus();return toast('Give the project a name first');}
-    const p=Object.assign({id:uid('prj'),createdAt:new Date().toISOString()},d);
+    const p=Object.assign({id:uid('prj'),createdAt:new Date().toISOString(),createdBy:displayName},d);
     reg.projects.push(p);
     if(pendingFolder){ await folderPut(p.id,pendingFolder); pendingFolder=null; }
     close(); await save(); render(true); toast('Saved '+p.name);
@@ -665,7 +702,7 @@ function editProject(id){
   wireColors(r); wireFolder(r,id);
   r.querySelector('#go').onclick=async()=>{
     const d=readProject(r); if(!d.name)return toast('Give the project a name first');
-    Object.assign(p,d,{updatedAt:new Date().toISOString()});
+    Object.assign(p,d,{updatedAt:new Date().toISOString(),updatedBy:displayName});
     close(); await save(); render(true); toast('Saved '+p.name);
   };
 }
@@ -698,7 +735,7 @@ function logIssuance(projectId){
       pageCount:parseInt(val(r,'f_pages'),10)||0,
       datasheetCount:parseInt(val(r,'f_sheets'),10)||0,fileName:val(r,'f_file'),hasSchedule:/schedule/i.test(val(r,'f_pkg')),
       fixtureTags:val(r,'f_types').split(',').map(s=>s.trim()).filter(Boolean),transmittedTo:val(r,'f_to'),
-      notes:val(r,'f_inotes'),recordedAt:new Date().toISOString(),manual:true});
+      notes:val(r,'f_inotes'),recordedAt:new Date().toISOString(),manual:true,loggedBy:displayName});
     const p2=projOf(pid); if(p2&&iv.issuedFor)p2.phase=iv.issuedFor;
     close(); await save(); render(true); toast('Issuance logged');
   };
@@ -710,8 +747,9 @@ function detail(id){
   const iss=issFor(id), types=typesFor(id);
   const kv=(k,v)=>'<div><div class="det-k">'+k+'</div><div class="det-v'+(v?'':' dim')+'">'+esc(v||'Not recorded')+'</div></div>';
   const sec=(h,v)=>'<div class="det-sec"><h4>'+h+'</h4><p'+(v?'':' class="det-v dim"')+'>'+esc(v||'Nothing recorded yet.')+'</p></div>';
-  modal((p.priority?'★ ':'')+p.name,(p.abbreviation?p.abbreviation+' · ':'')+(p.status||'Active')+(p.phase?' · '+p.phase:''),
-    '<div class="det-meta">'+kv('Subtitle',p.subtitle)+kv('Client',p.client)+kv('Location',p.location)+kv('Sector',p.sector)+kv('Project no.',p.number)+kv('Lighting lead',p.lead)+kv('Point person(s)',p.team)+'</div>'+
+  modal((p.priority?'★ ':'')+p.name,(p.abbreviation?p.abbreviation+' · ':'')+(p.status||'Active')+(p.phase?' · '+p.phase:'')+(p.createdBy?' · Added by '+p.createdBy:''),
+    '<div class="det-meta">'+kv('Subtitle',p.subtitle)+kv('Client',p.client)+kv('Location',p.location)+kv('Sector',p.sector)+kv('Project no.',p.number)+kv('Lighting lead',p.lead)+kv('Point person(s)',p.team)+
+    (p.updatedBy&&p.updatedBy!==p.createdBy?kv('Last updated by',p.updatedBy):'')+'</div>'+
     (p.cutsheetFolder?'<div class="det-sec"><h4>Cutsheets folder</h4><p style="font-family:var(--mono);font-size:11.5px;word-break:break-all">'+esc(p.cutsheetFolder)+'</p></div>':'')+
     sec('Description / scope',p.description)+
     (types.length?'<div class="det-sec"><h4>Luminaire types on record ('+types.length+')</h4><div class="tags">'+types.map(t=>'<span class="tag tag-sky">'+esc(t)+'</span>').join('')+'</div></div>':'')+
@@ -722,7 +760,7 @@ function detail(id){
     '<div class="det-sec"><h4>Issuance history ('+iss.length+')</h4>'+
       (iss.length?iss.map(i=>'<div class="iss-row"><span class="iss-d">'+fmt(i.date)+'</span><span class="iss-b">'+
         '<span class="iss-t">'+esc(i.issuanceDescription||i.issuedFor||i.packageType||'Package')+(i.revision?' · '+esc(i.revision):'')+(i.manual?'':' <span class="tag tag-sage">compiled</span>')+'</span>'+
-        '<span class="iss-s">'+[i.issuedFor&&i.issuedFor!==i.issuanceDescription?i.issuedFor:'',i.fileName,i.pageCount?i.pageCount+' pp':'',i.datasheetCount?i.datasheetCount+' datasheets':'',(i.fixtureTags||[]).length?(i.fixtureTags||[]).length+' types':'',i.transmittedTo?'to '+i.transmittedTo:''].filter(Boolean).map(esc).join(' · ')+'</span>'+
+        '<span class="iss-s">'+[i.issuedFor&&i.issuedFor!==i.issuanceDescription?i.issuedFor:'',i.fileName,i.pageCount?i.pageCount+' pp':'',i.datasheetCount?i.datasheetCount+' datasheets':'',(i.fixtureTags||[]).length?(i.fixtureTags||[]).length+' types':'',i.transmittedTo?'to '+i.transmittedTo:'',i.loggedBy?'logged by '+i.loggedBy:''].filter(Boolean).map(esc).join(' · ')+'</span>'+
         (i.notes?'<span class="iss-n">'+esc(i.notes)+'</span>':'')+
         '</span><button class="btn btn-ghost btn-sm" data-del="'+i.id+'">&times;</button></div>').join('')
       :'<p class="det-v dim">No issuances logged yet.</p>')+'</div>',
@@ -1572,17 +1610,25 @@ async function generate(preview){
       if(chk(document,'cSync')&&issuedFor)p.phase=issuedFor;
       p.updatedAt=new Date().toISOString();
       if(chk(document,'cLog')){
-        reg.issuances.push({id:uid('iss'),projectId:p.id,date:raw||new Date().toISOString().slice(0,10),
+        const newIss={id:uid('iss'),projectId:p.id,date:raw||new Date().toISOString().slice(0,10),
           issuedFor,revision:val(document,'cRev'),packageType:hasSched?'Schedule & datasheets':'Datasheets only',
           issuanceDescription:issDesc,
           fileName,pageCount:pages,datasheetCount:datasheetFiles.length,hasSchedule:hasSched,
           fixtureTags:stagedTags(),transmittedTo:val(document,'cTo'),notes:val(document,'cNotes'),
-          recordedAt:new Date().toISOString()});
-        await save(); renderRail(); refreshDelta();
-        setStatus(pages+' pages compiled — '+
-          (savedTo?'saved to the Cutsheets folder as “'+esc(savedTo)+'”':'downloaded as “'+esc(fileName)+'”')+
-          ' — and logged to '+esc(p.abbreviation||p.name)+'.','ok');
-        toast('Logged to '+(p.abbreviation||p.name));
+          recordedAt:new Date().toISOString(),loggedBy:displayName};
+        reg.issuances.push(newIss);
+        let ok=await save({silent:true});
+        if(!ok){ await load(); reg.issuances.push(newIss); ok=await save(); }
+        renderRail();
+        if(ok){
+          refreshDelta();
+          setStatus(pages+' pages compiled — '+
+            (savedTo?'saved to the Cutsheets folder as “'+esc(savedTo)+'”':'downloaded as “'+esc(fileName)+'”')+
+            ' — and logged to '+esc(p.abbreviation||p.name)+'.','ok');
+          toast('Logged to '+(p.abbreviation||p.name));
+        } else {
+          toast('Package compiled and downloaded, but logging to the registry failed — log it manually.');
+        }
       } else { await save(); renderRail(); }
     }
   }catch(err){
@@ -1609,10 +1655,13 @@ function visible(){
 }
 const statusTag=s=>{const c=s==='Active'?'tag-sage':s==='On hold'?'tag-sand':s==='Complete'?'tag-sky':'';return '<span class="tag '+c+'">'+esc(s||'Active')+'</span>';};
 const emptyState=(t,x,b)=>'<div class="empty"><h3>'+t+'</h3><p>'+x+'</p>'+(b?'<button class="btn btn-dark" id="emptyAdd">'+b+'</button>':'')+'</div>';
+const projectsEmptyState=()=>(STORE==='server'&&loadFailed)?
+  emptyState('Couldn’t load the shared registry','Check your connection and reload the page — this doesn’t necessarily mean the registry is empty.','Reload'):
+  emptyState('No projects on record yet','Add a project, then compile its first package from the same screen.','+ Add project');
 
 function tableView(){
   const list=visible();
-  if(!reg.projects.length)return emptyState('No projects on record yet','Add a project, then compile its first package from the same screen.','+ Add project');
+  if(!reg.projects.length)return projectsEmptyState();
   if(!list.length)return emptyState('Nothing matches those filters','Try the abbreviation, the client, or a luminaire type.');
   return '<table class="tbl"><thead><tr><th>Abbr</th><th>Project</th><th>Client</th><th>Phase</th><th>Status</th><th>Issuances</th><th>Last issued</th><th>Types</th><th></th></tr></thead><tbody>'+
     list.map(p=>{const i=issFor(p.id),t=typesFor(p.id);return '<tr data-open="'+p.id+'">'+
@@ -1626,7 +1675,7 @@ function tableView(){
 }
 function boardView(){
   const list=visible();
-  if(!reg.projects.length)return emptyState('No projects on record yet','Add a project, then compile its first package from the same screen.','+ Add project');
+  if(!reg.projects.length)return projectsEmptyState();
   return '<div class="board">'+STATUSES.map(s=>{
     const col=list.filter(p=>(p.status||'Active')===s);
     return '<div><div class="col-head"><span class="col-title">'+esc(s)+'</span><span class="col-count">'+col.length+'</span></div>'+
@@ -1876,7 +1925,7 @@ function bindView(){
   const host=$('view');
   host.querySelectorAll('[data-open]').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-compile]'))return;detail(el.dataset.open);});
   host.querySelectorAll('[data-compile]').forEach(b=>b.onclick=e=>{e.stopPropagation();openCompiler(b.dataset.compile);});
-  const ea=host.querySelector('#emptyAdd'); if(ea)ea.onclick=()=>addProject();
+  const ea=host.querySelector('#emptyAdd'); if(ea)ea.onclick=(STORE==='server'&&loadFailed)?(()=>location.reload()):(()=>addProject());
   host.querySelectorAll('[data-cal]').forEach(b=>b.onclick=e=>{
     e.stopPropagation();
     const v=parseInt(b.dataset.cal,10);
@@ -1977,7 +2026,7 @@ $('nav').querySelectorAll('button[data-sec]').forEach(b=>b.onclick=()=>{
 });
 $('newPkg').onclick=pickProjectThenCompile;
 
-load().then(()=>render(true));
+load().then(()=>{render(true); maybeAskName();});
 })();
 </script>
 </body>
