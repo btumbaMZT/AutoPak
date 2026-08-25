@@ -9,6 +9,11 @@ async function ensureSchema() {
     updated_at timestamptz not null default now(),
     updated_by text
   )`;
+  // Optimistic-concurrency counter. A plain integer avoids the precision
+  // mismatch between Postgres's microsecond timestamptz and JS's
+  // millisecond Date round-trip, which made timestamp-based CAS spuriously
+  // conflict on every save.
+  await sql`alter table registry add column if not exists revision integer not null default 1`;
   await sql`insert into registry (id, doc) values (1, '{"version":1,"projects":[],"issuances":[]}'::jsonb)
     on conflict (id) do nothing`;
 }
@@ -18,7 +23,7 @@ module.exports = async function handler(req, res) {
     await ensureSchema();
 
     if (req.method === 'GET') {
-      const rows = await sql`select doc, updated_at from registry where id = 1`;
+      const rows = await sql`select doc, updated_at, revision from registry where id = 1`;
       const row = rows[0];
       const doc = (row && row.doc) || { version: 1, projects: [], issuances: [] };
       res.status(200).json({
@@ -26,27 +31,33 @@ module.exports = async function handler(req, res) {
         projects: doc.projects || [],
         issuances: doc.issuances || [],
         updatedAt: row && row.updated_at,
+        revision: row && row.revision,
       });
       return;
     }
 
     if (req.method === 'PUT') {
       const body = req.body && typeof req.body === 'object' ? req.body : JSON.parse(req.body || '{}');
-      const { doc, expectedUpdatedAt, updatedBy } = body || {};
+      const { doc, expectedRevision, updatedBy } = body || {};
       if (!doc || !Array.isArray(doc.projects) || !Array.isArray(doc.issuances)) {
         res.status(400).json({ ok: false, error: 'Malformed registry document' });
         return;
       }
       const docJson = JSON.stringify(doc);
-      const rows = await sql`update registry set doc = ${docJson}::jsonb, updated_at = now(), updated_by = ${updatedBy || null}
-        where id = 1 and updated_at = ${expectedUpdatedAt || null} returning updated_at`;
+      const rows = await sql`update registry set doc = ${docJson}::jsonb, revision = revision + 1,
+        updated_at = now(), updated_by = ${updatedBy || null}
+        where id = 1 and revision = ${expectedRevision || null} returning updated_at, revision`;
 
       if (rows.length === 0) {
-        const cur = await sql`select updated_at from registry where id = 1`;
-        res.status(409).json({ ok: false, error: 'conflict', currentUpdatedAt: cur[0] && cur[0].updated_at });
+        const cur = await sql`select updated_at, revision from registry where id = 1`;
+        res.status(409).json({
+          ok: false, error: 'conflict',
+          currentUpdatedAt: cur[0] && cur[0].updated_at,
+          currentRevision: cur[0] && cur[0].revision,
+        });
         return;
       }
-      res.status(200).json({ ok: true, updatedAt: rows[0].updated_at });
+      res.status(200).json({ ok: true, updatedAt: rows[0].updated_at, revision: rows[0].revision });
       return;
     }
 

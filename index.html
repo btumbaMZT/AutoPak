@@ -409,7 +409,7 @@ const hasServer=location.protocol==='http:'||location.protocol==='https:';
 const hasLocal=(function(){try{localStorage.setItem(KEY+':probe','1');localStorage.removeItem(KEY+':probe');return true;}catch(e){return false;}})();
 const STORE=hasServer?'server':hasLocal?'local':'none';
 let reg={version:1,projects:[],issuances:[]}, storeOk=STORE!=='none';
-let lastLoadedUpdatedAt=null;
+let lastLoadedRevision=null;
 function getName(){try{return localStorage.getItem(NAME_KEY)||'';}catch(e){return '';}}
 function setName(n){try{localStorage.setItem(NAME_KEY,n);}catch(e){}}
 let displayName=getName();
@@ -427,7 +427,7 @@ async function load(){
   if(STORE==='server'){
     try{
       const res=await fetch('/api/registry');
-      if(res.ok){ const d=await res.json(); if(d&&Array.isArray(d.projects))reg=d; lastLoadedUpdatedAt=(d&&d.updatedAt)||null; storeOk=true; }
+      if(res.ok){ const d=await res.json(); if(d&&Array.isArray(d.projects))reg=d; lastLoadedRevision=(d&&d.revision)||null; storeOk=true; }
       else storeOk=false;
     }catch(e){ storeOk=false; }
     return;
@@ -439,10 +439,10 @@ async function save(opts){ opts=opts||{}; reg.updatedAt=new Date().toISOString()
   if(STORE==='server'){
     try{
       const res=await fetch('/api/registry',{method:'PUT',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({doc:{version:reg.version,projects:reg.projects,issuances:reg.issuances},expectedUpdatedAt:lastLoadedUpdatedAt,updatedBy:displayName})});
+        body:JSON.stringify({doc:{version:reg.version,projects:reg.projects,issuances:reg.issuances},expectedRevision:lastLoadedRevision,updatedBy:displayName})});
       if(res.status===409){ storeOk=false; renderRail(); if(!opts.silent)showConflict(); return false; }
       if(!res.ok){ storeOk=false; if(!opts.silent)toast('Save failed — export a backup before closing'); renderRail(); return false; }
-      const body=await res.json(); reg.updatedAt=body.updatedAt; lastLoadedUpdatedAt=body.updatedAt;
+      const body=await res.json(); reg.updatedAt=body.updatedAt; lastLoadedRevision=body.revision;
       storeOk=true; return true;
     }catch(e){ storeOk=false; if(!opts.silent)toast('Save failed — export a backup before closing'); renderRail(); return false; }
   }
