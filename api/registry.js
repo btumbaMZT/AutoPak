@@ -1,4 +1,6 @@
-const { sql } = require('@vercel/postgres');
+const { neon } = require('@neondatabase/serverless');
+
+const sql = neon(process.env.DATABASE_URL);
 
 async function ensureSchema() {
   await sql`create table if not exists registry (
@@ -16,7 +18,7 @@ module.exports = async function handler(req, res) {
     await ensureSchema();
 
     if (req.method === 'GET') {
-      const { rows } = await sql`select doc, updated_at from registry where id = 1`;
+      const rows = await sql`select doc, updated_at from registry where id = 1`;
       const row = rows[0];
       const doc = (row && row.doc) || { version: 1, projects: [], issuances: [] };
       res.status(200).json({
@@ -36,15 +38,15 @@ module.exports = async function handler(req, res) {
         return;
       }
       const docJson = JSON.stringify(doc);
-      const result = await sql`update registry set doc = ${docJson}::jsonb, updated_at = now(), updated_by = ${updatedBy || null}
+      const rows = await sql`update registry set doc = ${docJson}::jsonb, updated_at = now(), updated_by = ${updatedBy || null}
         where id = 1 and updated_at = ${expectedUpdatedAt || null} returning updated_at`;
 
-      if (result.rows.length === 0) {
-        const { rows } = await sql`select updated_at from registry where id = 1`;
-        res.status(409).json({ ok: false, error: 'conflict', currentUpdatedAt: rows[0] && rows[0].updated_at });
+      if (rows.length === 0) {
+        const cur = await sql`select updated_at from registry where id = 1`;
+        res.status(409).json({ ok: false, error: 'conflict', currentUpdatedAt: cur[0] && cur[0].updated_at });
         return;
       }
-      res.status(200).json({ ok: true, updatedAt: result.rows[0].updated_at });
+      res.status(200).json({ ok: true, updatedAt: rows[0].updated_at });
       return;
     }
 
