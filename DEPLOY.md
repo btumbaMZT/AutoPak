@@ -34,11 +34,14 @@ neither of which needs to sit on a public host.
 | **B — Git** | Git account | **Yes** | Auto-deploy on every push |
 | **C — Drop** | Nothing | **No — new URL each time** | A 2-minute look, once |
 
-**Route A is the one to use.** The reason is specific to AutoPak: the registry
-lives in `localStorage`, which browsers scope **per origin**. Every project gets
-its own URL, so a changing URL means a vanishing registry. Route C creates a
-brand-new project on every upload, which means a new URL, which means everyone's
-project records disappear. Fine to look at, wrong to live on.
+**Route B (Git) is what's actually deployed.** The registry now lives in
+Postgres, behind `/api/registry`, shared by everyone who hits the domain — it's
+no longer the origin-scoped `localStorage` that made Route A's "same URL every
+time" so important. Route A/CLI still works for a one-off deploy if you ever
+need it. **Route C (Vercel Drop) will not work for this project anymore** —
+Drop only uploads the four static files listed there, with no way to include
+the `api/` folder or `package.json` the backend needs, so a Drop deployment
+would load with a permanently empty, unsaveable registry.
 
 ---
 
@@ -98,8 +101,10 @@ You want to see `x-robots-tag: noindex, nofollow, ...`. If it's missing,
 `vercel.json` didn't get uploaded — confirm it's in the folder and redeploy.
 
 **Step 6 — open it and confirm.** Load the URL, add a project, reload, and check
-it is still there — that is the registry writing to `localStorage`. Visit
-`/compiler` for the standalone tool. Compile a small package to be sure.
+it is still there — that's the round trip through `/api/registry` to Postgres,
+not a local browser cache, so it should show up for anyone else who opens the
+same URL too. Visit `/compiler` for the standalone tool. Compile a small
+package to be sure.
 
 For a package with no project record, either use `/compiler` or, in the
 dashboard, **+ Package → Standalone** — that mode reads and writes nothing in
@@ -200,9 +205,6 @@ clobbering the first — reload and redo the edit against the latest data.
 - **Opening `index.html` straight from disk (`file://`)** still falls back to
   the old private per-machine `localStorage` behavior — no network calls, no
   name prompt. Only the Vercel-hosted URL is the shared, office-wide copy.
-
-If shared records become the point, that's a real backend — Vercel Postgres or
-Blob behind an API route, plus auth. A follow-up, not a config change.
 
 **2. Folder linking gets better, not worse.**
 "Link folder…" uses the File System Access API, which needs a secure context.

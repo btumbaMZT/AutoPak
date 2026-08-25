@@ -410,6 +410,7 @@ const hasLocal=(function(){try{localStorage.setItem(KEY+':probe','1');localStora
 const STORE=hasServer?'server':hasLocal?'local':'none';
 let reg={version:1,projects:[],issuances:[]}, storeOk=STORE!=='none';
 let lastLoadedRevision=null;
+let loadFailed=false;
 function getName(){try{return localStorage.getItem(NAME_KEY)||'';}catch(e){return '';}}
 function setName(n){try{localStorage.setItem(NAME_KEY,n);}catch(e){}}
 let displayName=getName();
@@ -427,9 +428,9 @@ async function load(){
   if(STORE==='server'){
     try{
       const res=await fetch('/api/registry');
-      if(res.ok){ const d=await res.json(); if(d&&Array.isArray(d.projects))reg=d; lastLoadedRevision=(d&&d.revision)||null; storeOk=true; }
-      else storeOk=false;
-    }catch(e){ storeOk=false; }
+      if(res.ok){ const d=await res.json(); if(d&&Array.isArray(d.projects))reg=d; lastLoadedRevision=(d&&d.revision)||null; storeOk=true; loadFailed=false; }
+      else { storeOk=false; loadFailed=true; }
+    }catch(e){ storeOk=false; loadFailed=true; }
     return;
   }
   if(STORE==='local'){ try{adopt(localStorage.getItem(KEY));}catch(e){} return; }
@@ -746,8 +747,9 @@ function detail(id){
   const iss=issFor(id), types=typesFor(id);
   const kv=(k,v)=>'<div><div class="det-k">'+k+'</div><div class="det-v'+(v?'':' dim')+'">'+esc(v||'Not recorded')+'</div></div>';
   const sec=(h,v)=>'<div class="det-sec"><h4>'+h+'</h4><p'+(v?'':' class="det-v dim"')+'>'+esc(v||'Nothing recorded yet.')+'</p></div>';
-  modal((p.priority?'★ ':'')+p.name,(p.abbreviation?p.abbreviation+' · ':'')+(p.status||'Active')+(p.phase?' · '+p.phase:''),
-    '<div class="det-meta">'+kv('Subtitle',p.subtitle)+kv('Client',p.client)+kv('Location',p.location)+kv('Sector',p.sector)+kv('Project no.',p.number)+kv('Lighting lead',p.lead)+kv('Point person(s)',p.team)+'</div>'+
+  modal((p.priority?'★ ':'')+p.name,(p.abbreviation?p.abbreviation+' · ':'')+(p.status||'Active')+(p.phase?' · '+p.phase:'')+(p.createdBy?' · Added by '+p.createdBy:''),
+    '<div class="det-meta">'+kv('Subtitle',p.subtitle)+kv('Client',p.client)+kv('Location',p.location)+kv('Sector',p.sector)+kv('Project no.',p.number)+kv('Lighting lead',p.lead)+kv('Point person(s)',p.team)+
+    (p.updatedBy&&p.updatedBy!==p.createdBy?kv('Last updated by',p.updatedBy):'')+'</div>'+
     (p.cutsheetFolder?'<div class="det-sec"><h4>Cutsheets folder</h4><p style="font-family:var(--mono);font-size:11.5px;word-break:break-all">'+esc(p.cutsheetFolder)+'</p></div>':'')+
     sec('Description / scope',p.description)+
     (types.length?'<div class="det-sec"><h4>Luminaire types on record ('+types.length+')</h4><div class="tags">'+types.map(t=>'<span class="tag tag-sky">'+esc(t)+'</span>').join('')+'</div></div>':'')+
@@ -758,7 +760,7 @@ function detail(id){
     '<div class="det-sec"><h4>Issuance history ('+iss.length+')</h4>'+
       (iss.length?iss.map(i=>'<div class="iss-row"><span class="iss-d">'+fmt(i.date)+'</span><span class="iss-b">'+
         '<span class="iss-t">'+esc(i.issuanceDescription||i.issuedFor||i.packageType||'Package')+(i.revision?' · '+esc(i.revision):'')+(i.manual?'':' <span class="tag tag-sage">compiled</span>')+'</span>'+
-        '<span class="iss-s">'+[i.issuedFor&&i.issuedFor!==i.issuanceDescription?i.issuedFor:'',i.fileName,i.pageCount?i.pageCount+' pp':'',i.datasheetCount?i.datasheetCount+' datasheets':'',(i.fixtureTags||[]).length?(i.fixtureTags||[]).length+' types':'',i.transmittedTo?'to '+i.transmittedTo:''].filter(Boolean).map(esc).join(' · ')+'</span>'+
+        '<span class="iss-s">'+[i.issuedFor&&i.issuedFor!==i.issuanceDescription?i.issuedFor:'',i.fileName,i.pageCount?i.pageCount+' pp':'',i.datasheetCount?i.datasheetCount+' datasheets':'',(i.fixtureTags||[]).length?(i.fixtureTags||[]).length+' types':'',i.transmittedTo?'to '+i.transmittedTo:'',i.loggedBy?'logged by '+i.loggedBy:''].filter(Boolean).map(esc).join(' · ')+'</span>'+
         (i.notes?'<span class="iss-n">'+esc(i.notes)+'</span>':'')+
         '</span><button class="btn btn-ghost btn-sm" data-del="'+i.id+'">&times;</button></div>').join('')
       :'<p class="det-v dim">No issuances logged yet.</p>')+'</div>',
@@ -1653,10 +1655,13 @@ function visible(){
 }
 const statusTag=s=>{const c=s==='Active'?'tag-sage':s==='On hold'?'tag-sand':s==='Complete'?'tag-sky':'';return '<span class="tag '+c+'">'+esc(s||'Active')+'</span>';};
 const emptyState=(t,x,b)=>'<div class="empty"><h3>'+t+'</h3><p>'+x+'</p>'+(b?'<button class="btn btn-dark" id="emptyAdd">'+b+'</button>':'')+'</div>';
+const projectsEmptyState=()=>(STORE==='server'&&loadFailed)?
+  emptyState('Couldn’t load the shared registry','Check your connection and reload the page — this doesn’t necessarily mean the registry is empty.','Reload'):
+  emptyState('No projects on record yet','Add a project, then compile its first package from the same screen.','+ Add project');
 
 function tableView(){
   const list=visible();
-  if(!reg.projects.length)return emptyState('No projects on record yet','Add a project, then compile its first package from the same screen.','+ Add project');
+  if(!reg.projects.length)return projectsEmptyState();
   if(!list.length)return emptyState('Nothing matches those filters','Try the abbreviation, the client, or a luminaire type.');
   return '<table class="tbl"><thead><tr><th>Abbr</th><th>Project</th><th>Client</th><th>Phase</th><th>Status</th><th>Issuances</th><th>Last issued</th><th>Types</th><th></th></tr></thead><tbody>'+
     list.map(p=>{const i=issFor(p.id),t=typesFor(p.id);return '<tr data-open="'+p.id+'">'+
@@ -1670,7 +1675,7 @@ function tableView(){
 }
 function boardView(){
   const list=visible();
-  if(!reg.projects.length)return emptyState('No projects on record yet','Add a project, then compile its first package from the same screen.','+ Add project');
+  if(!reg.projects.length)return projectsEmptyState();
   return '<div class="board">'+STATUSES.map(s=>{
     const col=list.filter(p=>(p.status||'Active')===s);
     return '<div><div class="col-head"><span class="col-title">'+esc(s)+'</span><span class="col-count">'+col.length+'</span></div>'+
@@ -1920,7 +1925,7 @@ function bindView(){
   const host=$('view');
   host.querySelectorAll('[data-open]').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-compile]'))return;detail(el.dataset.open);});
   host.querySelectorAll('[data-compile]').forEach(b=>b.onclick=e=>{e.stopPropagation();openCompiler(b.dataset.compile);});
-  const ea=host.querySelector('#emptyAdd'); if(ea)ea.onclick=()=>addProject();
+  const ea=host.querySelector('#emptyAdd'); if(ea)ea.onclick=(STORE==='server'&&loadFailed)?(()=>location.reload()):(()=>addProject());
   host.querySelectorAll('[data-cal]').forEach(b=>b.onclick=e=>{
     e.stopPropagation();
     const v=parseInt(b.dataset.cal,10);
