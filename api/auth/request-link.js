@@ -1,6 +1,8 @@
-const { sql, ensureAuthSchema, newToken, hashToken, TOKEN_MINUTES } = require('../../lib/auth');
-const { sendAuthEmail } = require('../../lib/email');
+const { sql, ensureAuthSchema } = require('../../lib/auth');
 
+// No automated email exists in this app. This just records the request so
+// it shows up in the Admin panel — an admin generates and hand-delivers
+// the actual sign-in link (see api/admin/invite.js).
 module.exports = async function handler(req, res) {
   try {
     if (req.method !== 'POST') {
@@ -17,21 +19,10 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const rows = await sql`insert into users (email) values (${email})
-      on conflict (email) do update set email = excluded.email
-      returning *`;
-    const user = rows[0];
+    await sql`insert into users (email) values (${email})
+      on conflict (email) do nothing`;
 
-    if (user.status !== 'rejected') {
-      const raw = newToken();
-      const hash = hashToken(raw);
-      const minutes = `${TOKEN_MINUTES} minutes`;
-      await sql`insert into magic_link_tokens (user_id, token_hash, expires_at)
-        values (${user.id}, ${hash}, now() + ${minutes}::interval)`;
-      await sendAuthEmail(user, raw);
-    }
-
-    // Always a generic response — never reveal account status pre-verification.
+    // Always a generic response — never reveal account status.
     res.status(200).json({ ok: true });
   } catch (err) {
     console.error(err);

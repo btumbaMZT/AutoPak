@@ -513,18 +513,19 @@ function renderAuthGate(state,data){
   $('app').hidden=true;
   let h='';
   if(state==='request'){
-    h='<div class="sheet-hd"><div><h2>Sign in to AutoPak</h2><p>Mazzetti studio access only</p></div></div>'+
+    h='<div class="sheet-hd"><div><h2>Request access to AutoPak</h2><p>Mazzetti studio access only — by invitation</p></div></div>'+
       '<div class="sheet-bd"><div class="f full"><label for="ag_email">Work email</label>'+
       '<input id="ag_email" type="email" placeholder="you@mazzetti.com" autocomplete="email"></div>'+
+      '<p class="det-v dim">Already have a sign-in link? Open that link instead — you don’t need this form.</p>'+
       (data.error?'<p class="det-v" style="color:#b3492b">'+esc(data.error)+'</p>':'')+'</div>'+
-      '<div class="sheet-ft"><button class="btn btn-dark" id="ag_go">Send sign-in link</button></div>';
+      '<div class="sheet-ft"><button class="btn btn-dark" id="ag_go">Request access</button></div>';
   }else if(state==='sent'){
-    h='<div class="sheet-hd"><div><h2>Check your email</h2><p>One-time link, expires in 15 minutes</p></div></div>'+
-      '<div class="sheet-bd"><p class="det-v">We sent a sign-in link to <b>'+esc(data.email||'')+'</b>.</p></div>'+
+    h='<div class="sheet-hd"><div><h2>Request received</h2><p>An admin will send you a sign-in link</p></div></div>'+
+      '<div class="sheet-bd"><p class="det-v">We’ve logged the request for <b>'+esc(data.email||'')+'</b>. An admin reviews these and sends a sign-in link directly — nothing is emailed automatically, so give them a nudge if it’s urgent.</p></div>'+
       '<div class="sheet-ft"><button class="btn btn-ghost" id="ag_back">Use a different email</button></div>';
   }else if(state==='pending'){
-    h='<div class="sheet-hd"><div><h2>Almost there</h2><p>Waiting on admin approval</p></div></div>'+
-      '<div class="sheet-bd"><p class="det-v">You’re verified as <b>'+esc(data.email||'')+'</b>. An admin (btumba@mazzetti.com) needs to approve your account before you can use AutoPak.</p></div>'+
+    h='<div class="sheet-hd"><div><h2>Waiting on approval</h2><p>An admin needs to let you in</p></div></div>'+
+      '<div class="sheet-bd"><p class="det-v">Your request for <b>'+esc(data.email||'')+'</b> is waiting on admin review. An admin (btumba@mazzetti.com) approves access and sends a sign-in link directly.</p></div>'+
       '<div class="sheet-ft"><button class="btn" id="ag_refresh">Refresh</button><button class="btn btn-ghost" id="ag_signout">Sign out</button></div>';
   }else{
     h='<div class="sheet-hd"><div><h2>Access not approved</h2></div></div>'+
@@ -1939,27 +1940,69 @@ async function loadAdmin(){
   adminLoaded=true;
   if(section==='admin')renderView(false);
 }
+function showInviteLink(email,link){
+  modal('Sign-in link for '+email,'Send this to them yourself — nothing is emailed automatically',
+    '<div class="f full"><label for="inv_link">One-time link (valid 7 days)</label>'+
+    '<input id="inv_link" type="text" readonly value="'+esc(link)+'"></div>'+
+    '<p class="det-v dim">They click it once to sign in, then stay signed in for 60 days.</p>',
+    '<button class="btn" data-close>Done</button><button class="btn btn-dark" id="inv_copy">Copy link</button>');
+  const r=$('modalRoot');
+  const inp=r.querySelector('#inv_link');
+  inp.onclick=()=>inp.select();
+  r.querySelector('#inv_copy').onclick=async()=>{
+    try{ await navigator.clipboard.writeText(link); toast('Link copied'); }
+    catch(e){ inp.select(); toast('Press Ctrl+C to copy'); }
+  };
+}
+async function inviteEmail(email){
+  const r=await fetch('/api/admin/invite',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email})});
+  const d=await r.json();
+  if(!d.ok){ toast(d.error||'Could not create invite'); return false; }
+  showInviteLink(d.email,d.link); loadAdmin(); return true;
+}
 function adminView(){
   if(!adminLoaded)return '<p class="det-v dim">Loading…</p>';
-  const pendingRows=adminPending.length?adminPending.map(u=>'<tr><td>'+esc(u.email)+'</td><td class="t-dim">'+fmt(u.verifiedAt)+'</td>'+
-    '<td><button class="btn btn-sm" data-approve="'+u.id+'">Approve</button> <button class="btn btn-sm btn-danger" data-reject="'+u.id+'">Reject</button></td></tr>').join('')
-    :'<tr><td colspan="3" class="t-dim">No pending registrations.</td></tr>';
+  const pendingRows=adminPending.length?adminPending.map(u=>'<tr><td>'+esc(u.email)+'</td><td class="t-dim">'+fmt(u.createdAt)+'</td>'+
+    '<td><button class="btn btn-sm" data-approve="'+esc(u.email)+'">Approve &amp; get link</button> <button class="btn btn-sm btn-danger" data-reject="'+u.id+'">Reject</button></td></tr>').join('')
+    :'<tr><td colspan="3" class="t-dim">No pending requests.</td></tr>';
   const userRows=adminUsers.length?adminUsers.map(u=>'<tr><td>'+esc(u.email)+'</td><td class="t-dim">'+esc(u.name||'—')+'</td>'+
-    '<td><button class="btn btn-sm" data-setadmin="'+u.id+'" data-makeadmin="'+(u.isAdmin?'0':'1')+'">'+(u.isAdmin?'Remove admin':'Make admin')+'</button></td></tr>').join('')
+    '<td><button class="btn btn-sm" data-relink="'+esc(u.email)+'">New link</button> '+
+    '<button class="btn btn-sm" data-setadmin="'+u.id+'" data-makeadmin="'+(u.isAdmin?'0':'1')+'">'+(u.isAdmin?'Remove admin':'Make admin')+'</button></td></tr>').join('')
     :'<tr><td colspan="3" class="t-dim">No approved users.</td></tr>';
-  return '<div class="det-sec"><h4>Pending registrations ('+adminPending.length+')</h4>'+
-    '<table class="tbl"><thead><tr><th>Email</th><th>Verified</th><th></th></tr></thead><tbody>'+pendingRows+'</tbody></table></div>'+
+  return '<div class="det-sec"><h4>Invite someone</h4>'+
+    '<div class="f full"><label for="inv_email">Their @mazzetti.com email</label>'+
+    '<input id="inv_email" type="email" placeholder="someone@mazzetti.com"></div>'+
+    '<button class="btn btn-dark btn-sm" id="inv_go">Create sign-in link</button></div>'+
+    '<div class="det-sec"><h4>Pending requests ('+adminPending.length+')</h4>'+
+    '<table class="tbl"><thead><tr><th>Email</th><th>Requested</th><th></th></tr></thead><tbody>'+pendingRows+'</tbody></table></div>'+
     '<div class="det-sec"><h4>Approved users ('+adminUsers.length+')</h4>'+
     '<table class="tbl"><thead><tr><th>Email</th><th>Name</th><th></th></tr></thead><tbody>'+userRows+'</tbody></table></div>';
 }
 function bindAdminView(host){
+  const go=host.querySelector('#inv_go'), inv=host.querySelector('#inv_email');
+  if(go&&inv){
+    const submit=async()=>{
+      const v=inv.value.trim();
+      if(!/^[^\s@]+@mazzetti\.com$/i.test(v))return toast('Use an @mazzetti.com email address');
+      go.disabled=true;
+      const ok=await inviteEmail(v);
+      if(ok)inv.value='';
+      go.disabled=false;
+    };
+    go.onclick=submit;
+    inv.onkeydown=e=>{if(e.key==='Enter')submit();};
+  }
   host.querySelectorAll('[data-approve]').forEach(b=>b.onclick=async()=>{
     b.disabled=true;
-    await fetch('/api/admin/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:b.dataset.approve})});
-    toast('Approved'); loadAdmin();
+    await inviteEmail(b.dataset.approve);
+  });
+  host.querySelectorAll('[data-relink]').forEach(b=>b.onclick=async()=>{
+    b.disabled=true;
+    await inviteEmail(b.dataset.relink);
+    b.disabled=false;
   });
   host.querySelectorAll('[data-reject]').forEach(b=>b.onclick=async()=>{
-    if(!confirm('Reject this registration? They will not be able to re-register with this email.'))return;
+    if(!confirm('Reject this request? They will not be able to request access again with this email.'))return;
     b.disabled=true;
     await fetch('/api/admin/reject',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:b.dataset.reject})});
     toast('Rejected'); loadAdmin();
@@ -2005,7 +2048,7 @@ const TITLES={
   issuances:['Issuance log','Every package the studio has sent out, newest first'],
   types:['Luminaire type library','Which types have been specified, and where'],
   compile:['Compile a package','Stamped, merged and logged against the project record'],
-  admin:['Admin','Approve registrations and manage admin access']
+  admin:['Admin','Invite people, approve requests, and manage admin access']
 };
 function renderRail(){
   const t=new Set();reg.issuances.forEach(i=>(i.fixtureTags||[]).forEach(x=>x&&t.add(x)));
