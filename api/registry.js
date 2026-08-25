@@ -1,4 +1,5 @@
 const { neon } = require('@neondatabase/serverless');
+const { ensureAuthSchema, requireApproved } = require('../lib/auth');
 
 const sql = neon(process.env.DATABASE_URL);
 
@@ -21,6 +22,9 @@ async function ensureSchema() {
 module.exports = async function handler(req, res) {
   try {
     await ensureSchema();
+    await ensureAuthSchema();
+    const user = await requireApproved(req, res);
+    if (!user) return;
 
     if (req.method === 'GET') {
       const rows = await sql`select doc, updated_at, revision from registry where id = 1`;
@@ -38,14 +42,15 @@ module.exports = async function handler(req, res) {
 
     if (req.method === 'PUT') {
       const body = req.body && typeof req.body === 'object' ? req.body : JSON.parse(req.body || '{}');
-      const { doc, expectedRevision, updatedBy } = body || {};
+      const { doc, expectedRevision } = body || {};
       if (!doc || !Array.isArray(doc.projects) || !Array.isArray(doc.issuances)) {
         res.status(400).json({ ok: false, error: 'Malformed registry document' });
         return;
       }
       const docJson = JSON.stringify(doc);
+      const updatedBy = user.name || user.email;
       const rows = await sql`update registry set doc = ${docJson}::jsonb, revision = revision + 1,
-        updated_at = now(), updated_by = ${updatedBy || null}
+        updated_at = now(), updated_by = ${updatedBy}
         where id = 1 and revision = ${expectedRevision || null} returning updated_at, revision`;
 
       if (rows.length === 0) {
