@@ -10,6 +10,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+/* Auth gating uses the hidden attribute on elements whose own rules set a
+   display value (.app is grid, #authGate is flex, nav buttons are flex).
+   Those author rules beat the browser's [hidden]{display:none}, so state
+   this explicitly or nothing ever actually hides. */
+[hidden]{display:none !important}
 
 :root{
   --brand:#006595;--brand-deep:#00506f;--ink:#141719;--paper:#fff;--field:#fafaf8;--line:#e6e4df;
