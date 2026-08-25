@@ -1,8 +1,10 @@
-const { sql, ensureAuthSchema, requireAdmin, newToken, hashToken, verifyUrl, INVITE_TOKEN_MINUTES } = require('../../lib/auth');
+const { sql, ensureAuthSchema, requireAdmin, issueLoginLink } = require('../../lib/auth');
 
 // Approves an email (whether or not they'd already requested access) and
-// returns a sign-in link for the admin to deliver by hand. There is no
-// automated email in this app — the admin pastes this into Outlook/Teams.
+// returns their permanent sign-in link for the admin to deliver by hand.
+// There is no automated email in this app — the admin pastes this into
+// Outlook/Teams. Approval is once and forever: the link keeps working, so
+// the recipient never needs a new one, even after signing out.
 module.exports = async function handler(req, res) {
   try {
     if (req.method !== 'POST') {
@@ -32,13 +34,8 @@ module.exports = async function handler(req, res) {
         rejected_by = null
       returning id, email`;
     const user = rows[0];
-
-    const raw = newToken();
-    const minutes = `${INVITE_TOKEN_MINUTES} minutes`;
-    await sql`insert into magic_link_tokens (user_id, token_hash, expires_at)
-      values (${user.id}, ${hashToken(raw)}, now() + ${minutes}::interval)`;
-
-    res.status(200).json({ ok: true, email: user.email, link: verifyUrl(raw) });
+    const link = await issueLoginLink(user.id);
+    res.status(200).json({ ok: true, email: user.email, link });
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: 'Server error' });

@@ -504,6 +504,9 @@ async function checkSession(){
   }
 }
 async function doSignOut(){
+  // Worth a warning: there's no password to sign back in with, so getting
+  // back in means finding their sign-in link again (or asking an admin).
+  if(!confirm('Sign out?\n\nYou’ll need your sign-in link to get back in — the one you bookmarked, or a new one from an admin.'))return;
   try{await fetch('/api/auth/logout',{method:'POST'});}catch(e){}
   location.reload();
 }
@@ -1942,9 +1945,11 @@ async function loadAdmin(){
 }
 function showInviteLink(email,link){
   modal('Sign-in link for '+email,'Send this to them yourself — nothing is emailed automatically',
-    '<div class="f full"><label for="inv_link">One-time link (valid 7 days)</label>'+
+    '<div class="f full"><label for="inv_link">Their permanent sign-in link</label>'+
     '<input id="inv_link" type="text" readonly value="'+esc(link)+'"></div>'+
-    '<p class="det-v dim">They click it once to sign in, then stay signed in on that browser until they sign out — or until you revoke their access here.</p>',
+    '<p class="det-v dim">This link doesn’t expire and can be used as often as they like — tell them to bookmark it. '+
+    'They stay signed in on each browser they use it on, and only need it again if they sign out or switch computers. '+
+    'Approval is permanent: you won’t need to approve them a second time.</p>',
     '<button class="btn" data-close>Done</button><button class="btn btn-dark" id="inv_copy">Copy link</button>');
   const r=$('modalRoot');
   const inp=r.querySelector('#inv_link');
@@ -1966,7 +1971,7 @@ function adminView(){
     '<td><button class="btn btn-sm" data-approve="'+esc(u.email)+'">Approve &amp; get link</button> <button class="btn btn-sm btn-danger" data-reject="'+u.id+'">Reject</button></td></tr>').join('')
     :'<tr><td colspan="3" class="t-dim">No pending requests.</td></tr>';
   const userRows=adminUsers.length?adminUsers.map(u=>'<tr><td>'+esc(u.email)+'</td><td class="t-dim">'+esc(u.name||'—')+'</td>'+
-    '<td><button class="btn btn-sm" data-relink="'+esc(u.email)+'">New link</button> '+
+    '<td><button class="btn btn-sm" data-relink="'+esc(u.email)+'">Replace link</button> '+
     '<button class="btn btn-sm" data-setadmin="'+u.id+'" data-makeadmin="'+(u.isAdmin?'0':'1')+'">'+(u.isAdmin?'Remove admin':'Make admin')+'</button></td></tr>').join('')
     :'<tr><td colspan="3" class="t-dim">No approved users.</td></tr>';
   return '<div class="det-sec"><h4>Invite someone</h4>'+
@@ -1997,6 +2002,9 @@ function bindAdminView(host){
     await inviteEmail(b.dataset.approve);
   });
   host.querySelectorAll('[data-relink]').forEach(b=>b.onclick=async()=>{
+    // Only needed if they lost their link or it leaked — issuing a new one
+    // kills the old, so any bookmark they still have stops working.
+    if(!confirm('Replace this person’s sign-in link?\n\nTheir existing link stops working, so only do this if they’ve lost it or it needs revoking. Any browser they’re already signed in on stays signed in.'))return;
     b.disabled=true;
     await inviteEmail(b.dataset.relink);
     b.disabled=false;

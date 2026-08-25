@@ -13,6 +13,9 @@ p{color:#7a7770;font-size:14px;line-height:1.5;margin-bottom:20px}
 button,.btn{display:inline-block;background:#141719;color:#fff;border:none;text-decoration:none;
   padding:11px 22px;border-radius:6px;font-weight:600;font-size:14px;cursor:pointer}
 button:disabled{opacity:.5;cursor:default}
+.tip{font-size:13px;background:#fafaf8;border:1px solid #e6e4df;border-radius:8px;
+  padding:12px 14px;margin:20px 0 0;text-align:left}
+.tip b{color:#141719}
 .err{color:#b3492b}
 </style></head><body><div class="sheet">${body}</div></body></html>`;
 }
@@ -27,10 +30,9 @@ module.exports = async function handler(req, res) {
       if (!token) { res.status(400).send(page('<h1>Missing link</h1><p>That link looks incomplete.</p>')); return; }
 
       const hash = hashToken(token);
-      const rows = await sql`select u.email from magic_link_tokens t join users u on u.id = t.user_id
-        where t.token_hash = ${hash} and t.consumed_at is null and t.expires_at > now()`;
+      const rows = await sql`select email from users where login_token_hash = ${hash}`;
       if (!rows[0]) {
-        res.status(400).send(page('<h1>Link expired</h1><p>This sign-in link is invalid or has already been used. Go back to AutoPak and request a new one.</p>'));
+        res.status(400).send(page('<h1>Link not valid</h1><p>This sign-in link isn’t recognised — it may have been replaced by a newer one. Ask an admin for your current link.</p>'));
         return;
       }
 
@@ -38,6 +40,8 @@ module.exports = async function handler(req, res) {
         <h1>Confirm sign-in</h1>
         <p>Sign in to AutoPak as <b>${rows[0].email}</b>?</p>
         <button id="go">Confirm</button>
+        <p class="tip"><b>Bookmark this page.</b> It’s your permanent sign-in link —
+        use it any time you need to sign in again, on this or any other computer.</p>
         <p id="msg" style="margin-top:16px"></p>
         <script>
           document.getElementById('go').onclick = async () => {
@@ -58,17 +62,15 @@ module.exports = async function handler(req, res) {
       const token = String((body && body.token) || '');
       if (!token) { res.status(400).json({ ok: false, error: 'Missing token' }); return; }
 
+      // Reusable on purpose — the token is not consumed, so the same link
+      // works every time the user needs to sign in again.
       const hash = hashToken(token);
-      const claimed = await sql`update magic_link_tokens set consumed_at = now()
-        where token_hash = ${hash} and consumed_at is null and expires_at > now()
-        returning user_id`;
-      if (!claimed[0]) {
-        res.status(400).json({ ok: false, error: 'This link is invalid, expired, or already used.' });
+      const userRows = await sql`update users set verified_at = coalesce(verified_at, now())
+        where login_token_hash = ${hash} returning *`;
+      if (!userRows[0]) {
+        res.status(400).json({ ok: false, error: 'This link isn’t recognised — it may have been replaced by a newer one.' });
         return;
       }
-
-      const userRows = await sql`update users set verified_at = coalesce(verified_at, now())
-        where id = ${claimed[0].user_id} returning *`;
       const user = userRows[0];
       const raw = await createSession(user.id);
       setSessionCookie(res, raw);
