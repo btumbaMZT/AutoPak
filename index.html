@@ -461,7 +461,7 @@ function showConflict(){
 function maybeAskName(){
   if(displayName||STORE!=='server')return;
   modal('What’s your name?','Shown on records you add or edit — you can skip this',
-    '<div class="f full"><label for="f_name_prompt">Your name</label><input id="f_name_prompt" type="text" placeholder="e.g. Batu Tumba"></div>',
+    '<div class="f full"><label for="f_name_prompt">Your name</label><input id="f_name_prompt" type="text" placeholder="e.g. Jane Smith"></div>',
     '<button class="btn" id="skip">Skip</button><button class="btn btn-dark" id="go">Save</button>');
   const r=$('modalRoot');
   r.querySelector('#skip').onclick=close;
