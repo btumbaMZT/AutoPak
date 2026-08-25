@@ -1944,7 +1944,7 @@ function showInviteLink(email,link){
   modal('Sign-in link for '+email,'Send this to them yourself — nothing is emailed automatically',
     '<div class="f full"><label for="inv_link">One-time link (valid 7 days)</label>'+
     '<input id="inv_link" type="text" readonly value="'+esc(link)+'"></div>'+
-    '<p class="det-v dim">They click it once to sign in, then stay signed in for 60 days.</p>',
+    '<p class="det-v dim">They click it once to sign in, then stay signed in on that browser until they sign out — or until you revoke their access here.</p>',
     '<button class="btn" data-close>Done</button><button class="btn btn-dark" id="inv_copy">Copy link</button>');
   const r=$('modalRoot');
   const inp=r.querySelector('#inv_link');
