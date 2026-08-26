@@ -706,6 +706,24 @@ function editProject(id){
     close(); await save(); render(true); toast('Saved '+p.name);
   };
 }
+function duplicateProject(id){
+  const src=projOf(id);if(!src)return;
+  // Fields only — a template, not a clone: no issuance history, and no
+  // project number / cutsheet folder, since those are meant to be unique
+  // per project rather than shared with the project this was copied from.
+  const prefill=Object.assign({},src,{name:src.name+' (Copy)',status:'Active',number:'',cutsheetFolder:''});
+  const r=modal('Duplicate ‘'+src.name+'’','Fields only — no issuance history is copied',projectForm(prefill),
+    '<button class="btn" data-close>Cancel</button><button class="btn btn-dark" id="go">Save as new project</button>');
+  pendingFolder=null;
+  wireColors(r); wireFolder(r,null);
+  r.querySelector('#go').onclick=async()=>{
+    const d=readProject(r); if(!d.name){r.querySelector('#f_name').focus();return toast('Give the project a name first');}
+    const p=Object.assign({id:uid('prj'),createdAt:new Date().toISOString(),createdBy:displayName},d);
+    reg.projects.push(p);
+    if(pendingFolder){ await folderPut(p.id,pendingFolder); pendingFolder=null; }
+    close(); await save(); render(true); toast('Saved '+p.name);
+  };
+}
 
 /* ═══════════ Manual issuance ═══════════ */
 function logIssuance(projectId){
@@ -765,11 +783,13 @@ function detail(id){
         '</span><button class="btn btn-ghost btn-sm" data-del="'+i.id+'">&times;</button></div>').join('')
       :'<p class="det-v dim">No issuances logged yet.</p>')+'</div>',
     '<button class="btn btn-danger btn-sm" id="dl">Delete</button><span class="spacer"></span>'+
+    '<button class="btn btn-sm" id="dup">Duplicate</button>'+
     '<button class="btn btn-sm" id="li">Log past issuance</button>'+
     '<button class="btn btn-sm" id="ed">Edit</button>'+
     '<button class="btn btn-dark btn-sm" id="cp">Compile package</button>',true);
   const r=$('modalRoot');
   r.querySelector('#ed').onclick=()=>swapModal(()=>editProject(id));
+  r.querySelector('#dup').onclick=()=>swapModal(()=>duplicateProject(id));
   r.querySelector('#li').onclick=()=>swapModal(()=>logIssuance(id));
   r.querySelector('#cp').onclick=()=>swapModal(()=>openCompiler(id));
   r.querySelector('#dl').onclick=async()=>{
