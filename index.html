@@ -10,6 +10,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+/* The auth gate toggles elements whose own rules set a display value (.app is
+   grid, #authGate is flex, nav buttons are flex). Those author rules beat the
+   browser's [hidden]{display:none}, so say it explicitly — otherwise nothing
+   ever actually hides and you get a blank page over the dashboard. */
+[hidden]{display:none !important}
 
 :root{
   --brand:#006595;--brand-deep:#00506f;--ink:#141719;--paper:#fff;--field:#fafaf8;--line:#e6e4df;
@@ -186,6 +191,23 @@ select:focus,input:focus,textarea:focus{border-color:var(--brand);box-shadow:0 0
 .empty h3{font-size:16px;font-weight:700;margin-bottom:6px}
 .empty p{font-family:var(--mono);font-size:12.5px;color:var(--muted)}
 .empty .btn{margin-top:16px}
+
+/* Auth gate */
+#authGate{position:fixed;inset:0;background:var(--field);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
+#authGate .sheet{max-width:410px;animation:none}
+#authGate .gate-mark{display:flex;flex-direction:column;gap:3px;margin-bottom:22px;color:var(--ink)}
+#authGate .gate-mark svg{width:132px;height:auto}
+#authGate .gate-mark span{font-family:var(--mono);font-size:10px;letter-spacing:.09em;color:var(--muted)}
+#authGate h2{font-size:17px;margin-bottom:7px}
+#authGate .gate-sub{color:var(--muted);font-size:13.5px;line-height:1.55;margin-bottom:22px}
+.ms-btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;width:100%;
+  background:var(--ink);color:#fff;text-decoration:none;border:none;font:inherit;font-size:14.5px;font-weight:600;
+  padding:12px 18px;border-radius:6px;cursor:pointer;transition:background .2s ease}
+.ms-btn:hover{background:#000}
+.ms-btn svg{width:17px;height:17px;flex:none}
+.gate-note{font-size:12px;color:var(--muted);margin-top:16px;line-height:1.5}
+.gate-err{font-size:13px;color:#b3492b;background:#fdf3f0;border:1px solid #f0d5cc;
+  border-radius:6px;padding:10px 12px;margin-bottom:18px;line-height:1.5}
 
 /* Modal */
 .veil{position:fixed;inset:0;background:rgba(20,23,25,.42);display:flex;align-items:flex-start;justify-content:center;padding:36px 16px;overflow-y:auto;z-index:40;animation:veilIn .3s cubic-bezier(.4,0,.2,1) both}
@@ -368,7 +390,8 @@ details.more .grid{margin-top:14px}
 </style>
 </head>
 <body>
-<div class="app">
+<div id="authGate" hidden></div>
+<div class="app" id="app" hidden>
   <aside class="rail">
     <div class="mark"><svg class="mark-logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 187.6 32.5"> <defs> <clipPath id="clip-0"> <path clip-rule="nonzero" d="M 1.222656 0 L 185.980469 0 L 185.980469 32.007812 L 1.222656 32.007812 Z M 1.222656 0 "/> </clipPath> <clipPath id="clip-1"> <path clip-rule="nonzero" d="M 0.222656 0 L 184.980469 0 L 184.980469 32.007812 L 0.222656 32.007812 Z M 0.222656 0 "/> </clipPath> <clipPath id="clip-2"> <path clip-rule="nonzero" d="M 0.222656 0 L 38 0 L 38 32.007812 L 0.222656 32.007812 Z M 0.222656 0 "/> </clipPath> <clipPath id="clip-3"> <path clip-rule="nonzero" d="M 132 7 L 176 7 L 176 32.007812 L 132 32.007812 Z M 132 7 "/> </clipPath> <clipPath id="clip-4"> <path clip-rule="nonzero" d="M 66 7 L 88 7 L 88 32.007812 L 66 32.007812 Z M 66 7 "/> </clipPath> <clipPath id="clip-5"> <path clip-rule="nonzero" d="M 90 7 L 111 7 L 111 32.007812 L 90 32.007812 Z M 90 7 "/> </clipPath> <clipPath id="clip-6"> <path clip-rule="nonzero" d="M 39 7 L 65 7 L 65 32.007812 L 39 32.007812 Z M 39 7 "/> </clipPath> <clipPath id="clip-7"> <path clip-rule="nonzero" d="M 113 7 L 131 7 L 131 32.007812 L 113 32.007812 Z M 113 7 "/> </clipPath> <clipPath id="clip-8"> <path clip-rule="nonzero" d="M 178 7 L 184.980469 7 L 184.980469 32.007812 L 178 32.007812 Z M 178 7 "/> </clipPath> <clipPath id="clip-9"> <path clip-rule="nonzero" d="M 26 17 L 32 17 L 32 32.007812 L 26 32.007812 Z M 26 17 "/> </clipPath> <clipPath id="clip-10"> <path clip-rule="nonzero" d="M 14 17 L 20 17 L 20 32.007812 L 14 32.007812 Z M 14 17 "/> </clipPath> <clipPath id="clip-11"> <rect x="0" y="0" width="185" height="33"/> </clipPath> <g id="source-5" clip-path="url(#clip-11)"> <g clip-path="url(#clip-2)"> <path fill-rule="nonzero" fill="currentColor" fill-opacity="1" d="M 23.429688 22.109375 C 23.097656 21.003906 22.796875 20 22.492188 18.988281 C 21.390625 15.332031 20.289062 11.671875 19.191406 8.015625 C 19.132812 7.8125 19.078125 7.664062 18.789062 7.664062 C 15.71875 7.675781 12.648438 7.675781 9.574219 7.675781 C 9.503906 7.675781 9.433594 7.679688 9.339844 7.6875 C 9.308594 8.023438 9.261719 8.34375 9.25 8.667969 C 9.167969 10.304688 9.105469 11.945312 9.023438 13.578125 C 8.933594 15.386719 8.835938 17.191406 8.734375 18.996094 C 8.644531 20.570312 8.535156 22.144531 8.453125 23.71875 C 8.390625 24.871094 8.355469 26.023438 8.296875 27.175781 C 8.210938 28.789062 8.117188 30.402344 8.023438 32.039062 L 0.476562 32.039062 L 0.476562 0.3125 L 37.628906 0.3125 L 37.628906 7.671875 L 37.195312 7.671875 C 34.253906 7.671875 31.320312 7.675781 28.378906 7.664062 C 28.101562 7.664062 27.980469 7.742188 27.894531 8.007812 C 26.464844 12.570312 25.03125 17.136719 23.589844 21.699219 C 23.558594 21.808594 23.507812 21.910156 23.429688 22.109375 "/> </g> <g clip-path="url(#clip-3)"> <path fill-rule="nonzero" fill="currentColor" fill-opacity="1" d="M 168.136719 32.046875 L 160.976562 32.046875 L 160.976562 13.957031 L 146.855469 13.957031 L 146.855469 32.039062 L 139.707031 32.039062 L 139.707031 13.949219 L 132.585938 13.949219 L 132.585938 7.976562 L 175.222656 7.976562 C 175.230469 8.085938 175.242188 8.199219 175.242188 8.316406 C 175.242188 10.058594 175.234375 11.796875 175.253906 13.535156 C 175.257812 13.867188 175.152344 13.941406 174.839844 13.9375 C 172.765625 13.925781 170.6875 13.933594 168.609375 13.933594 L 168.136719 13.933594 C 168.136719 19.976562 168.136719 25.992188 168.136719 32.046875 "/> </g> <g clip-path="url(#clip-4)"> <path fill-rule="nonzero" fill="currentColor" fill-opacity="1" d="M 87.75 26.117188 L 87.75 32.03125 L 66.941406 32.03125 C 66.941406 31.304688 66.910156 30.566406 66.960938 29.835938 C 66.972656 29.609375 67.207031 29.402344 67.34375 29.1875 C 70.53125 24.21875 73.71875 19.246094 76.90625 14.277344 C 76.964844 14.1875 77.011719 14.09375 77.105469 13.941406 L 67.53125 13.941406 L 67.53125 7.976562 L 87.8125 7.976562 C 87.8125 8.332031 87.78125 8.691406 87.820312 9.046875 C 87.898438 9.828125 87.65625 10.484375 87.238281 11.148438 C 84.183594 16.035156 81.164062 20.9375 78.140625 25.835938 C 78.09375 25.914062 78.050781 25.996094 77.988281 26.121094 C 81.257812 26.117188 84.484375 26.117188 87.75 26.117188 "/> </g> <g clip-path="url(#clip-5)"> <path fill-rule="nonzero" fill="currentColor" fill-opacity="1" d="M 110.847656 26.117188 L 110.847656 32.039062 L 90.023438 32.039062 C 90.023438 31.324219 90.015625 30.621094 90.03125 29.921875 C 90.03125 29.824219 90.101562 29.722656 90.160156 29.628906 C 93.4375 24.515625 96.710938 19.402344 99.988281 14.289062 C 100.054688 14.191406 100.109375 14.089844 100.195312 13.9375 L 90.628906 13.9375 L 90.628906 7.984375 L 110.902344 7.984375 C 110.902344 8.710938 110.914062 9.4375 110.890625 10.160156 C 110.882812 10.3125 110.746094 10.460938 110.65625 10.605469 C 107.535156 15.65625 104.410156 20.707031 101.289062 25.761719 C 101.226562 25.863281 101.167969 25.96875 101.078125 26.121094 C 104.355469 26.117188 107.585938 26.117188 110.847656 26.117188 "/> </g> <g clip-path="url(#clip-6)"> <path fill-rule="nonzero" fill="currentColor" fill-opacity="1" d="M 64.117188 32.0625 L 63.367188 32.0625 C 61.316406 32.0625 59.265625 32.058594 57.210938 32.070312 C 56.921875 32.074219 56.792969 32 56.703125 31.710938 C 56.34375 30.550781 55.957031 29.394531 55.5625 28.242188 C 55.527344 28.128906 55.375 27.976562 55.273438 27.976562 C 52.703125 27.964844 50.125 27.96875 47.523438 27.96875 C 47.222656 28.898438 46.921875 29.820312 46.621094 30.746094 C 46.5 31.113281 46.390625 31.484375 46.25 31.84375 C 46.210938 31.9375 46.078125 32.058594 45.984375 32.058594 C 43.835938 32.070312 41.691406 32.066406 39.480469 32.066406 C 39.640625 31.589844 39.78125 31.152344 39.933594 30.714844 C 42.496094 23.242188 45.0625 15.773438 47.621094 8.300781 C 47.707031 8.050781 47.820312 7.945312 48.101562 7.945312 C 50.566406 7.960938 53.03125 7.957031 55.492188 7.949219 C 55.742188 7.949219 55.863281 8 55.953125 8.265625 C 58.613281 16.046875 61.289062 23.824219 63.957031 31.601562 C 64.007812 31.730469 64.050781 31.867188 64.117188 32.0625 M 49.085938 22.96875 L 53.921875 22.96875 C 53.121094 20.445312 52.332031 17.957031 51.539062 15.46875 C 51.515625 15.46875 51.492188 15.472656 51.46875 15.472656 C 50.679688 17.957031 49.890625 20.449219 49.085938 22.96875 "/> </g> <g clip-path="url(#clip-7)"> <path fill-rule="nonzero" fill="currentColor" fill-opacity="1" d="M 120.875 22.175781 L 120.875 27.132812 L 130.140625 27.132812 L 130.140625 32.035156 L 113.71875 32.035156 L 113.71875 7.976562 L 129.777344 7.976562 L 129.777344 12.898438 L 120.882812 12.898438 L 120.882812 17.285156 L 129.117188 17.285156 L 129.117188 22.171875 C 126.386719 22.175781 123.648438 22.175781 120.875 22.175781 "/> </g> <g clip-path="url(#clip-8)"> <path fill-rule="nonzero" fill="currentColor" fill-opacity="1" d="M 185.140625 32.046875 L 178.046875 32.046875 L 178.046875 7.984375 L 185.140625 7.984375 Z M 185.140625 32.046875 "/> </g> <g clip-path="url(#clip-9)"> <path fill-rule="nonzero" fill="currentColor" fill-opacity="1" d="M 30.964844 17.585938 C 30.984375 17.730469 31.015625 17.871094 31.019531 18.015625 C 31.070312 19.410156 31.113281 20.804688 31.171875 22.199219 C 31.253906 23.984375 31.351562 25.761719 31.441406 27.546875 C 31.46875 28.054688 31.484375 28.566406 31.507812 29.074219 C 31.546875 30.054688 31.582031 31.03125 31.621094 32.039062 L 26.207031 32.039062 C 27.773438 27.210938 29.332031 22.390625 30.890625 17.574219 C 30.917969 17.578125 30.941406 17.582031 30.964844 17.585938 "/> </g> <g clip-path="url(#clip-10)"> <path fill-rule="nonzero" fill="currentColor" fill-opacity="1" d="M 14.347656 32.039062 C 14.589844 27.207031 14.828125 22.410156 15.070312 17.613281 C 15.089844 17.609375 15.109375 17.605469 15.128906 17.597656 C 16.664062 22.402344 18.191406 27.203125 19.734375 32.039062 C 17.933594 32.039062 16.160156 32.039062 14.347656 32.039062 "/> </g> </g> </defs> <g clip-path="url(#clip-0)"> <use xlink:href="#source-5" transform="matrix(1, 0, 0, 1, 1, 0)"/> </g> </svg><span class="mark-word">LIGHTING DESIGN STUDIO</span><span class="mark-app">AutoPak Cutsheet Compiler</span></div>
     <nav class="nav" id="nav">
@@ -376,6 +399,7 @@ details.more .grid{margin-top:14px}
       <button data-sec="projects" aria-current="true"><span class="dot"></span>Projects</button>
       <button data-sec="issuances"><span class="dot"></span>Issuance log</button>
       <button data-sec="types"><span class="dot"></span>Luminaire types</button>
+      <button data-sec="admin" id="navAdmin" hidden><span class="dot"></span>Admin</button>
       <button class="make" id="newPkg">+ Compile package</button>
     </nav>
     <div class="rail-foot">
@@ -383,6 +407,7 @@ details.more .grid{margin-top:14px}
       <div class="rail-stat"><span>Issuances</span><b id="sIssuances">—</b></div>
       <div class="rail-stat"><span>Types</span><b id="sTypes">—</b></div>
       <div class="rail-stat"><span>Last issued</span><b id="sLast">—</b></div>
+      <div class="rail-stat" id="whoami" hidden><span id="whoamiName">—</span><button class="btn btn-ghost btn-sm" id="signOut">Sign out</button></div>
     </div>
   </aside>
 
@@ -400,20 +425,20 @@ details.more .grid{margin-top:14px}
 (function(){
 /* ═══════════ Storage ═══════════ */
 const KEY='mazzetti:luminaire-registry:v1';
-const NAME_KEY='mazzetti:display-name:v1';
 // Server mode (http/https) shares one registry via /api/registry for everyone
-// on the deployed site. Local mode is the fallback for when this file is
-// opened straight from disk (file://), where records persist per-machine in
-// localStorage instead of evaporating with the tab.
+// on the deployed site, behind Microsoft sign-in. Local mode is the fallback
+// for when this file is opened straight from disk (file://), where records
+// persist per-machine in localStorage — that mode never touches the network,
+// so sign-in doesn't apply to it.
 const hasServer=location.protocol==='http:'||location.protocol==='https:';
 const hasLocal=(function(){try{localStorage.setItem(KEY+':probe','1');localStorage.removeItem(KEY+':probe');return true;}catch(e){return false;}})();
 const STORE=hasServer?'server':hasLocal?'local':'none';
 let reg={version:1,projects:[],issuances:[]}, storeOk=STORE!=='none';
 let lastLoadedRevision=null;
 let loadFailed=false;
-function getName(){try{return localStorage.getItem(NAME_KEY)||'';}catch(e){return '';}}
-function setName(n){try{localStorage.setItem(NAME_KEY,n);}catch(e){}}
-let displayName=getName();
+// Identity comes from the Microsoft session, not a self-declared name.
+let currentUser=null;
+const whoAmI=()=>currentUser?(currentUser.name||currentUser.email):'';
 
 const $=id=>document.getElementById(id);
 const uid=p=>p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -429,6 +454,7 @@ async function load(){
     try{
       const res=await fetch('/api/registry');
       if(res.ok){ const d=await res.json(); if(d&&Array.isArray(d.projects))reg=d; lastLoadedRevision=(d&&d.revision)||null; storeOk=true; loadFailed=false; }
+      else if(res.status===401||res.status===403){ checkSession(); }
       else { storeOk=false; loadFailed=true; }
     }catch(e){ storeOk=false; loadFailed=true; }
     return;
@@ -440,8 +466,9 @@ async function save(opts){ opts=opts||{}; reg.updatedAt=new Date().toISOString()
   if(STORE==='server'){
     try{
       const res=await fetch('/api/registry',{method:'PUT',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({doc:{version:reg.version,projects:reg.projects,issuances:reg.issuances},expectedRevision:lastLoadedRevision,updatedBy:displayName})});
+        body:JSON.stringify({doc:{version:reg.version,projects:reg.projects,issuances:reg.issuances},expectedRevision:lastLoadedRevision})});
       if(res.status===409){ storeOk=false; renderRail(); if(!opts.silent)showConflict(); return false; }
+      if(res.status===401||res.status===403){ storeOk=false; renderRail(); checkSession(); return false; }
       if(!res.ok){ storeOk=false; if(!opts.silent)toast('Save failed — export a backup before closing'); renderRail(); return false; }
       const body=await res.json(); reg.updatedAt=body.updatedAt; lastLoadedRevision=body.revision;
       storeOk=true; return true;
@@ -459,18 +486,54 @@ function showConflict(){
     '<button class="btn btn-dark" id="go">Reload latest</button>');
   $('modalRoot').querySelector('#go').onclick=async()=>{ close(); await load(); render(true); };
 }
-function maybeAskName(){
-  if(displayName||STORE!=='server')return;
-  modal('What’s your name?','Shown on records you add or edit — you can skip this',
-    '<div class="f full"><label for="f_name_prompt">Your name</label><input id="f_name_prompt" type="text" placeholder="e.g. Jane Smith"></div>',
-    '<button class="btn" id="skip">Skip</button><button class="btn btn-dark" id="go">Save</button>');
-  const r=$('modalRoot');
-  r.querySelector('#skip').onclick=close;
-  r.querySelector('#go').onclick=()=>{
-    const v=r.querySelector('#f_name_prompt').value.trim();
-    if(v){displayName=v;setName(v);}
-    close();
-  };
+/* ═══════════ Auth ═══════════ */
+const MZ_M='<svg viewBox="-1 -4 40 40" aria-hidden="true"><path fill="#006595" d="M 23.429688 22.109375 C 23.097656 21.003906 22.796875 20 22.492188 18.988281 C 21.390625 15.332031 20.289062 11.671875 19.191406 8.015625 C 19.132812 7.8125 19.078125 7.664062 18.789062 7.664062 C 15.71875 7.675781 12.648438 7.675781 9.574219 7.675781 C 9.503906 7.675781 9.433594 7.679688 9.339844 7.6875 C 9.308594 8.023438 9.261719 8.34375 9.25 8.667969 C 9.167969 10.304688 9.105469 11.945312 9.023438 13.578125 C 8.933594 15.386719 8.835938 17.191406 8.734375 18.996094 C 8.644531 20.570312 8.535156 22.144531 8.453125 23.71875 C 8.390625 24.871094 8.355469 26.023438 8.296875 27.175781 C 8.210938 28.789062 8.117188 30.402344 8.023438 32.039062 L 0.476562 32.039062 L 0.476562 0.3125 L 37.628906 0.3125 L 37.628906 7.671875 L 37.195312 7.671875 C 34.253906 7.671875 31.320312 7.675781 28.378906 7.664062 C 28.101562 7.664062 27.980469 7.742188 27.894531 8.007812 C 26.464844 12.570312 25.03125 17.136719 23.589844 21.699219 C 23.558594 21.808594 23.507812 21.910156 23.429688 22.109375 "/></svg>';
+const MS_LOGO='<svg viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#F25022"/><rect x="11" y="1" width="9" height="9" fill="#7FBA00"/><rect x="1" y="11" width="9" height="9" fill="#00A4EF"/><rect x="11" y="11" width="9" height="9" fill="#FFB900"/></svg>';
+
+async function checkSession(){
+  if(STORE!=='server'){ $('app').hidden=false; return; }
+  try{
+    const r=await fetch('/api/auth/session');
+    const s=await r.json();
+    if(!s.authenticated){ renderAuthGate('signin',s); return; }
+    if(s.status==='blocked'){ renderAuthGate('blocked',s); return; }
+    currentUser=s;
+    $('authGate').hidden=true; $('app').hidden=false;
+    const nav=$('navAdmin'); if(nav)nav.hidden=!s.admin;
+    await load(); render(true);
+  }catch(e){
+    renderAuthGate('signin',{error:'Couldn’t reach the server. Reload to try again.'});
+  }
+}
+async function doSignOut(){
+  try{await fetch('/api/auth/logout',{method:'POST'});}catch(e){}
+  location.reload();
+}
+function renderAuthGate(state,data){
+  data=data||{};
+  const g=$('authGate');
+  $('app').hidden=true;
+  const mark='<div class="gate-mark">'+MZ_M+'<span>LIGHTING DESIGN STUDIO</span></div>';
+  let h='';
+  if(state==='blocked'){
+    h=mark+'<h2>Access blocked</h2>'+
+      '<p class="gate-sub">Your account (<b>'+esc(data.email||'')+'</b>) no longer has access to AutoPak. '+
+      'Contact btumba@mazzetti.com if this looks wrong.</p>'+
+      '<button class="btn" id="ag_signout">Sign out</button>';
+  }else{
+    // The error slot covers both a failed session check and the pre-launch
+    // case where the Azure app registration isn't wired up yet.
+    const err=data.error?'<p class="gate-err">'+esc(data.error)+'</p>'
+      :(data.configured===false?'<p class="gate-err">Microsoft sign-in isn’t switched on for this deployment yet — the Azure app registration is still pending.</p>':'');
+    h=mark+'<h2>Sign in to AutoPak</h2>'+
+      '<p class="gate-sub">The luminaire cutsheet registry and package compiler. Use your Mazzetti work account.</p>'+
+      err+
+      '<a class="ms-btn" id="ag_ms" href="/api/auth/login">'+MS_LOGO+'Sign in with Microsoft</a>'+
+      '<p class="gate-note">Limited to @mazzetti.com accounts.</p>';
+  }
+  g.innerHTML='<div class="sheet" style="padding:32px"><div class="sheet-bd" style="padding:0">'+h+'</div></div>';
+  g.hidden=false;
+  const so=$('ag_signout'); if(so)so.onclick=doSignOut;
 }
 
 /* ═══════════ Model ═══════════ */
@@ -688,7 +751,7 @@ function addProject(then){
   wireColors(r); wireFolder(r,null);
   r.querySelector('#go').onclick=async()=>{
     const d=readProject(r); if(!d.name){r.querySelector('#f_name').focus();return toast('Give the project a name first');}
-    const p=Object.assign({id:uid('prj'),createdAt:new Date().toISOString(),createdBy:displayName},d);
+    const p=Object.assign({id:uid('prj'),createdAt:new Date().toISOString(),createdBy:whoAmI()},d);
     reg.projects.push(p);
     if(pendingFolder){ await folderPut(p.id,pendingFolder); pendingFolder=null; }
     close(); await save(); render(true); toast('Saved '+p.name);
@@ -702,7 +765,7 @@ function editProject(id){
   wireColors(r); wireFolder(r,id);
   r.querySelector('#go').onclick=async()=>{
     const d=readProject(r); if(!d.name)return toast('Give the project a name first');
-    Object.assign(p,d,{updatedAt:new Date().toISOString(),updatedBy:displayName});
+    Object.assign(p,d,{updatedAt:new Date().toISOString(),updatedBy:whoAmI()});
     close(); await save(); render(true); toast('Saved '+p.name);
   };
 }
@@ -718,7 +781,7 @@ function duplicateProject(id){
   wireColors(r); wireFolder(r,null);
   r.querySelector('#go').onclick=async()=>{
     const d=readProject(r); if(!d.name){r.querySelector('#f_name').focus();return toast('Give the project a name first');}
-    const p=Object.assign({id:uid('prj'),createdAt:new Date().toISOString(),createdBy:displayName},d);
+    const p=Object.assign({id:uid('prj'),createdAt:new Date().toISOString(),createdBy:whoAmI()},d);
     reg.projects.push(p);
     if(pendingFolder){ await folderPut(p.id,pendingFolder); pendingFolder=null; }
     close(); await save(); render(true); toast('Saved '+p.name);
@@ -753,7 +816,7 @@ function logIssuance(projectId){
       pageCount:parseInt(val(r,'f_pages'),10)||0,
       datasheetCount:parseInt(val(r,'f_sheets'),10)||0,fileName:val(r,'f_file'),hasSchedule:/schedule/i.test(val(r,'f_pkg')),
       fixtureTags:val(r,'f_types').split(',').map(s=>s.trim()).filter(Boolean),transmittedTo:val(r,'f_to'),
-      notes:val(r,'f_inotes'),recordedAt:new Date().toISOString(),manual:true,loggedBy:displayName});
+      notes:val(r,'f_inotes'),recordedAt:new Date().toISOString(),manual:true,loggedBy:whoAmI()});
     const p2=projOf(pid); if(p2&&iv.issuedFor)p2.phase=iv.issuedFor;
     close(); await save(); render(true); toast('Issuance logged');
   };
@@ -1635,7 +1698,7 @@ async function generate(preview){
           issuanceDescription:issDesc,
           fileName,pageCount:pages,datasheetCount:datasheetFiles.length,hasSchedule:hasSched,
           fixtureTags:stagedTags(),transmittedTo:val(document,'cTo'),notes:val(document,'cNotes'),
-          recordedAt:new Date().toISOString(),loggedBy:displayName};
+          recordedAt:new Date().toISOString(),loggedBy:whoAmI()};
         reg.issuances.push(newIss);
         let ok=await save({silent:true});
         if(!ok){ await load(); reg.issuances.push(newIss); ok=await save(); }
@@ -1841,6 +1904,59 @@ function typesView(){
     '<td><div class="tags">'+[...e.projects].map(id=>{const p=projOf(id);return '<span class="tag">'+esc(p?(p.abbreviation||p.name):'—')+'</span>';}).join('')+'</div></td></tr>').join('')+'</tbody></table>';
 }
 
+/* ═══════════ Admin ═══════════ */
+let adminUsers=[], adminLoaded=false;
+async function loadAdmin(){
+  try{
+    const r=await fetch('/api/admin/users');
+    const d=await r.json();
+    if(d&&d.ok)adminUsers=d.users||[];
+  }catch(e){}
+  adminLoaded=true;
+  if(section==='admin')renderView(false);
+}
+function adminView(){
+  if(!adminLoaded)return '<p class="det-v dim">Loading…</p>';
+  const rows=adminUsers.length?adminUsers.map(u=>{
+    const me=currentUser&&u.email===currentUser.email;
+    return '<tr><td><div class="t-name">'+esc(u.name||u.email)+(me?' <span class="tag">you</span>':'')+'</div>'+
+      '<div class="t-dim">'+esc(u.email)+'</div></td>'+
+      '<td class="t-dim">'+(u.lastLoginAt?fmt(u.lastLoginAt):'never')+'</td>'+
+      '<td>'+(u.status==='blocked'?'<span class="tag tag-sand">blocked</span>':'<span class="tag tag-sage">active</span>')+
+        (u.isAdmin?' <span class="tag tag-sky">admin</span>':'')+'</td>'+
+      '<td><button class="btn btn-sm" data-setadmin="'+u.id+'" data-makeadmin="'+(u.isAdmin?'0':'1')+'"'+(me?' disabled':'')+'>'+
+        (u.isAdmin?'Remove admin':'Make admin')+'</button> '+
+      '<button class="btn btn-sm'+(u.status==='blocked'?'':' btn-danger')+'" data-setblocked="'+u.id+'" data-block="'+(u.status==='blocked'?'0':'1')+'"'+(me?' disabled':'')+'>'+
+        (u.status==='blocked'?'Unblock':'Block')+'</button></td></tr>';
+  }).join(''):'<tr><td colspan="4" class="t-dim">Nobody has signed in yet.</td></tr>';
+  return '<div class="det-sec"><h4>People ('+adminUsers.length+')</h4>'+
+    '<p class="det-v dim">Anyone with a Mazzetti work account can sign in — there’s nothing to approve. '+
+    'Block someone to cut their access; it takes effect on their next click, even if they’re already signed in.</p>'+
+    '<table class="tbl"><thead><tr><th>Person</th><th>Last sign-in</th><th>Status</th><th></th></tr></thead>'+
+    '<tbody>'+rows+'</tbody></table></div>';
+}
+function bindAdminView(host){
+  host.querySelectorAll('[data-setadmin]').forEach(b=>b.onclick=async()=>{
+    const makeAdmin=b.dataset.makeadmin==='1';
+    b.disabled=true;
+    const r=await fetch('/api/admin/set-admin',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({userId:b.dataset.setadmin,admin:makeAdmin})});
+    const d=await r.json();
+    if(!d.ok){ toast(d.error||'Failed'); b.disabled=false; return; }
+    toast(makeAdmin?'Promoted to admin':'Removed admin'); loadAdmin();
+  });
+  host.querySelectorAll('[data-setblocked]').forEach(b=>b.onclick=async()=>{
+    const blocked=b.dataset.block==='1';
+    if(blocked&&!confirm('Block this person?\n\nThey lose access immediately, even if they’re signed in right now. They can be unblocked here any time.'))return;
+    b.disabled=true;
+    const r=await fetch('/api/admin/set-blocked',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({userId:b.dataset.setblocked,blocked:blocked})});
+    const d=await r.json();
+    if(!d.ok){ toast(d.error||'Failed'); b.disabled=false; return; }
+    toast(blocked?'Blocked':'Unblocked'); loadAdmin();
+  });
+}
+
 /* ═══════════ Export ═══════════ */
 function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(a.href),100);}
 function exportJson(){dl(new Blob([JSON.stringify(reg,null,2)],{type:'application/json'}),'Mazzetti_Luminaire_Registry_'+new Date().toISOString().slice(0,10)+'.json');toast('Exported '+reg.projects.length+' projects');}
@@ -1871,7 +1987,8 @@ const TITLES={
   projects:['AutoPak Luminaire Cutsheet Compiler','Mazzetti — project record & issuance history'],
   issuances:['Issuance log','Every package the studio has sent out, newest first'],
   types:['Luminaire type library','Which types have been specified, and where'],
-  compile:['Compile a package','Stamped, merged and logged against the project record']
+  compile:['Compile a package','Stamped, merged and logged against the project record'],
+  admin:['Admin','Who can get in, and who can administer this']
 };
 function renderRail(){
   const t=new Set();reg.issuances.forEach(i=>(i.fixtureTags||[]).forEach(x=>x&&t.add(x)));
@@ -1880,7 +1997,11 @@ function renderRail(){
   $('sTypes').textContent=t.size;
   const l=reg.issuances.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))[0];
   $('sLast').textContent=l?fmtShort(l.date):'—';
+  const who=$('whoami');
+  if(currentUser){ who.hidden=false; $('whoamiName').textContent=currentUser.name||currentUser.email; }
+  else who.hidden=true;
 }
+$('signOut').onclick=doSignOut;
 let lastToolbarSection=null;
 function renderToolbar(){
   const t=$('toolbar');
@@ -1931,6 +2052,8 @@ function renderToolbar(){
       :(p?(p.abbreviation?p.abbreviation+' · ':'')+p.name:'No project'))+'</span>'+sync+
       '<span class="spacer"></span><button class="btn btn-sm" id="swap">Switch project</button>';
     $('swap').onclick=pickProjectThenCompile;
+  }else if(section==='admin'){
+    t.innerHTML='<span class="pill-count">'+adminUsers.length+' '+(adminUsers.length===1?'person':'people')+'</span>'+sync;
   }else{
     t.innerHTML='<input type="search" id="q" placeholder="Search luminaire types…" value="'+esc(q)+'"><span class="pill-count" id="tc"></span>'+sync;
     $('q').oninput=e=>{q=e.target.value;renderView(false);};
@@ -1939,10 +2062,12 @@ function renderToolbar(){
 function viewHtml(){
   return section==='projects' ? (view==='table'?tableView():view==='board'?boardView():timelineView())
     : section==='issuances' ? issuanceView()
+    : section==='admin' ? adminView()
     : typesView();
 }
 function bindView(){
   const host=$('view');
+  if(section==='admin')bindAdminView(host);
   host.querySelectorAll('[data-open]').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-compile]'))return;detail(el.dataset.open);});
   host.querySelectorAll('[data-compile]').forEach(b=>b.onclick=e=>{e.stopPropagation();openCompiler(b.dataset.compile);});
   const ea=host.querySelector('#emptyAdd'); if(ea)ea.onclick=(STORE==='server'&&loadFailed)?(()=>location.reload()):(()=>addProject());
@@ -2043,10 +2168,12 @@ $('nav').querySelectorAll('button[data-sec]').forEach(b=>b.onclick=()=>{
   section=b.dataset.sec;q='';compileMounted=false;
   $('nav').querySelectorAll('button[data-sec]').forEach(x=>x.setAttribute('aria-current',x===b));
   render(true);
+  if(section==='admin'){ adminLoaded=false; loadAdmin(); }
 });
 $('newPkg').onclick=pickProjectThenCompile;
 
-load().then(()=>{render(true); maybeAskName();});
+if(STORE==='server')checkSession();
+else{ $('app').hidden=false; load().then(()=>render(true)); }
 })();
 </script>
 </body>
